@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"net"
+	"os"
 
 	"github.com/quic-go/quic-go/internal/protocol"
 	"github.com/quic-go/quic-go/internal/utils"
@@ -47,11 +48,13 @@ var generateConnectionIDForInitial = protocol.GenerateConnectionIDForInitial
 // When the QUIC connection is closed, this UDP connection is closed.
 // See Dial for more details.
 func DialAddr(ctx context.Context, addr string, tlsConf *tls.Config, conf *Config) (Connection, error) {
-	udpConn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
+	network := getClientNetworkEnv()
+
+	udpConn, err := net.ListenUDP(network, &net.UDPAddr{IP: net.IPv4zero, Port: 0})
 	if err != nil {
 		return nil, err
 	}
-	udpAddr, err := net.ResolveUDPAddr("udp", addr)
+	udpAddr, err := net.ResolveUDPAddr(network, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -65,11 +68,13 @@ func DialAddr(ctx context.Context, addr string, tlsConf *tls.Config, conf *Confi
 // DialAddrEarly establishes a new 0-RTT QUIC connection to a server.
 // See DialAddr for more details.
 func DialAddrEarly(ctx context.Context, addr string, tlsConf *tls.Config, conf *Config) (EarlyConnection, error) {
-	udpConn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
+	network := getClientNetworkEnv()
+
+	udpConn, err := net.ListenUDP(network, &net.UDPAddr{IP: net.IPv4zero, Port: 0})
 	if err != nil {
 		return nil, err
 	}
-	udpAddr, err := net.ResolveUDPAddr("udp", addr)
+	udpAddr, err := net.ResolveUDPAddr(network, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -248,4 +253,13 @@ func (c *client) dial(ctx context.Context) error {
 		// handshake successfully completed
 		return nil
 	}
+}
+
+func getClientNetworkEnv() string {
+	network, set := os.LookupEnv("QUIC_GO_CLIENT_NETWORK_TYPE")
+	if set {
+		return network
+	}
+
+	return "udp"
 }
